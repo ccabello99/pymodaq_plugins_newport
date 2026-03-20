@@ -36,7 +36,7 @@ class DAQ_Move_Newport_SMC100(DAQ_Move_base):
         The particular object that allow the communication with the hardware, in general a python wrapper around the
          hardware library.
     """
-    _controller_units = '°'
+    _controller_units = 'mm'
     is_multiaxes = False
     _axis_names = ['1']
     _epsilon = 0.01

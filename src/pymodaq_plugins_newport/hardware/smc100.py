@@ -11,6 +11,7 @@ import pyvisa as visa
 
 CTRL_STATUS = {
     'configuration':      0x14,
+    'homing':             0x1E,
     'moving':             0x28,
     'ready from homing':  0x32,
     'ready from moving':  0x33,
@@ -89,21 +90,26 @@ class SMC100:
         sleep(0.5)
 
     def write(self, cmd: str):
-        """ Add device number to command and send to device. """
+        """Add device number to command and send to device."""
         cmd = f"{self.dev_number}{cmd}"
         self._device.write(cmd)
 
     def query(self, cmd: str) -> str:
-        """ Query device. """
-        # Add device number to command
         cmd_complete = f"{self.dev_number}{cmd}"
-        respons = self._device.query(cmd_complete)
-        # respons is build the following way:
-        # dev_number+cmd_return+answer | cmd_return never contains the question mark
-        #dev_number = int(respons[0])
-        #cmd_return = respons[1:3]
-        answer = respons[3:]
-
+        self._device.write(cmd_complete)
+        
+        respons = self._device.read()
+        
+        # Strip leading null bytes and whitespace
+        respons = respons.lstrip('\x00').strip()
+        
+        # Response format: dev_number + cmd_name + answer
+        # e.g. '1TS008010' → cmd is 'TS', answer is '008010'
+        # Skip device number (1 char) + command name (len of cmd without '?')
+        cmd_name = cmd.rstrip('?')  # 'PA?' → 'PA', 'TS' → 'TS'
+        prefix_len = 1 + len(cmd_name)  # e.g. 1 + 2 = 3
+        answer = respons[prefix_len:]
+        
         return answer
 
     def homing(self):
@@ -133,11 +139,9 @@ class SMC100:
 
     @property
     def is_moving(self) -> bool:
-        """ Check if device is moving. """
-        moving = CTRL_STATUS['moving']
-         # get controller status and convert hex string to int
+        """Check if device is moving or homing."""
         ctrl_status = int(self.error_and_controller_status()[1], 16)
-        return ctrl_status == moving
+        return ctrl_status in (CTRL_STATUS['moving'], 0x1E)  # 0x1E = HOMING
 
     def wait_move_finish(self, interval: float):
         """
