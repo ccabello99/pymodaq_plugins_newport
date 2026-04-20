@@ -21,16 +21,27 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
     axes_names: Union[List[str], Dict[str, int]] = {'1': 1, '2': 2, '3': 3, '4': 4}
     _epsilon: Union[float, List[float]] = 10.0
     data_actuator_type = DataActuatorType.DataActuator
+
+    devices_info = {"names": ["Far Field Main Pulse", "OAP Picos", "Far Field Pre-Pulse", "Target Pico", "Dscan Mirror"],
+                    "hostnames": ["8742-14296", "8742-14296", "8742-14382", "8742-14383", "8742-100628"],
+               "ips": ["192.168.178.202", "192.168.178.184", "192.168.178.184", "192.168.178.185", "192.168.178.217"],
+               }
+    
     
     params = [
-              {'title': 'IP address:', 'name': 'ip', 'type': 'str','value': "192.168.0.109"},
-              {'title': 'Axis parameters: ', 'name': 'axis_p','type': 'group','children':[
-                  {'title': 'Velocity (steps/s): ', 'name': 'speed_axis','type': 'int',
-                   'value':0,'min':1,'max':2e3},
-                  {'title': 'Acceleration (steps/s^2): ', 'name': 'acc_axis', 'type': 'int',
-                   'value':0,'min':1,'max':2e5},
-                  {'title': 'Type: ', 'name': 'motor', 'type':'str','value':'None'},]}] + \
-                  comon_parameters_fun(is_multiaxes, axes_names, epsilon=_epsilon)
+                {'title': 'Device Management:', 'name': 'device_manager', 'type': 'group', 'children': [
+                    {'title': 'Connected Devices:', 'name': 'connected_devices', 'type': 'list', 'limits': devices_info['names']},
+                    {'title': 'Host name:', 'name': 'hostname', 'type': 'str', 'value': "", 'readonly': True},
+                    {'title': 'IP address:', 'name': 'ip', 'type': 'str','value': "", 'readonly': True},
+                    {'title': 'Selected Device:', 'name': 'selected_device', 'type': 'str', 'value': '', 'readonly': True}
+                ]}, 
+                {'title': 'Axis parameters: ', 'name': 'axis_p','type': 'group','children':[
+                    {'title': 'Velocity (steps/s): ', 'name': 'speed_axis','type': 'int',
+                    'value':0,'min':1,'max':2e3},
+                    {'title': 'Acceleration (steps/s^2): ', 'name': 'acc_axis', 'type': 'int',
+                    'value':0,'min':1,'max':2e5},
+                    {'title': 'Type: ', 'name': 'motor', 'type':'str','value':'None'},]}] + \
+                    comon_parameters_fun(is_multiaxes, axes_names, epsilon=_epsilon)
 
     
     def ini_attributes(self):
@@ -51,6 +62,8 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
     def close(self):
         """Terminate the communication """
         self.controller.close()  
+        self.controller = None
+
 
     def commit_settings(self, param: Parameter):
         """Apply the consequences of a change of value in the detector settings
@@ -64,6 +77,17 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
             self.controller.setup_velocity(axis=self.axis_value,
                                            speed=self.settings['axis_p','speed_axis'],
                                            accel=self.settings['axis_p','acc_axis'])
+        elif param.name() == 'connected_devices':
+            device = self.settings.child('device_manager', 'connected_devices').value()
+            param_ = self.settings.child('device_manager', 'hostname')
+            index_ = self.devices_info['names'].index(device)
+            hostname = self.devices_info['hostnames'][index_]
+            param_.setValue(hostname)
+            param_.sigValueChanged.emit(param_, hostname)
+            param_ = self.settings.child('device_manager', 'ip')
+            ip = self.devices_info['ips'][index_]
+            param_.setValue(ip)
+            param_.sigValueChanged.emit(param_, ip)
         else:
             pass
 
@@ -84,7 +108,20 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
         self.controller = self.ini_stage_init(slave_controller=controller)
 
         if self.is_master:
-            self.controller = Newport.Picomotor8742(self.settings['ip'])
+            device = self.settings.child('device_manager', 'connected_devices').value()
+            param_ = self.settings.child('device_manager', 'hostname')
+            index_ = self.devices_info['names'].index(device)
+            hostname = self.devices_info['hostnames'][index_]
+            param_.setValue(hostname)
+            param_.sigValueChanged.emit(param_, hostname)
+            param_ = self.settings.child('device_manager', 'ip')
+            ip = self.devices_info['ips'][index_]
+            param_.setValue(ip)
+            param_.sigValueChanged.emit(param_, ip)
+            try:
+                self.controller = Newport.Picomotor8742(hostname)
+            except Exception:
+                self.controller = Newport.Picomotor8742(ip)
 
         try:
             info = self.controller.get_id()
@@ -94,13 +131,16 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
             initialized = False
 
         if initialized:
-            motor_types = self.controller.autodetect_motors()
-            axis = self.axis_value
-            self.settings['axis_p','motor'] = motor_types[axis-1]
-           
-            parameters_velocity = self.controller.get_velocity_parameters()
-            self.settings['axis_p','speed_axis'] = parameters_velocity[axis-1][0]
-            self.settings['axis_p','acc_axis'] = parameters_velocity[axis-1][1]
+            try:
+                motor_types = self.controller.autodetect_motors()
+                axis = self.axis_value
+                self.settings['axis_p','motor'] = motor_types[axis-1]
+            
+                parameters_velocity = self.controller.get_velocity_parameters()
+                self.settings['axis_p','speed_axis'] = parameters_velocity[axis-1][0]
+                self.settings['axis_p','acc_axis'] = parameters_velocity[axis-1][1]
+            except Exception as e:
+                print("Error setting axis parameters: ", e)
             
         return info, initialized
     
@@ -146,4 +186,4 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
 
 
 if __name__ == '__main__':
-    main(__file__)
+    main(__file__, init=False)
