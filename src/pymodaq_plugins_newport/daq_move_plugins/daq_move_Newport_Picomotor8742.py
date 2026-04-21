@@ -79,7 +79,7 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
         elif param.name() == 'connected_devices':
             device = self.settings.child('device_manager', 'connected_devices').value()
             param_ = self.settings.child('device_manager', 'hostname')
-            index_ = self.devices_info['names'].index(device)
+            index_ = self.devices_info['hostnames'].index(device)
             hostname = self.devices_info['hostnames'][index_]
             param_.setValue(hostname)
             param_.sigValueChanged.emit(param_, hostname)
@@ -109,7 +109,7 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
         if self.is_master:
             device = self.settings.child('device_manager', 'connected_devices').value()
             param_ = self.settings.child('device_manager', 'hostname')
-            index_ = self.devices_info['names'].index(device)
+            index_ = self.devices_info['hostnames'].index(device)
             hostname = self.devices_info['hostnames'][index_]
             param_.setValue(hostname)
             param_.sigValueChanged.emit(param_, hostname)
