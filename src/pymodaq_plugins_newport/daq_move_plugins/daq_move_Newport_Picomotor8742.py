@@ -22,15 +22,14 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
     _epsilon: Union[float, List[float]] = 10.0
     data_actuator_type = DataActuatorType.DataActuator
 
-    devices_info = {"names": ["Far Field Main Pulse", "OAP Picos", "Far Field Pre-Pulse", "Target Pico", "Dscan Mirror"],
-                    "hostnames": ["8742-14296", "8742-14296", "8742-14382", "8742-14383", "8742-100628"],
-               "ips": ["192.168.178.202", "192.168.178.184", "192.168.178.184", "192.168.178.185", "192.168.178.217"],
+    devices_info = {"hostnames": ["8742-14296", "8742-14382", "8742-14383", "8742-100628"],
+               "ips": ["192.168.178.202", "192.168.178.184", "192.168.178.185", "192.168.178.217"],
                }
     
     
     params = [
                 {'title': 'Device Management:', 'name': 'device_manager', 'type': 'group', 'children': [
-                    {'title': 'Connected Devices:', 'name': 'connected_devices', 'type': 'list', 'limits': devices_info['names']},
+                    {'title': 'Connected Devices:', 'name': 'connected_devices', 'type': 'list', 'limits': devices_info['hostnames']},
                     {'title': 'Host name:', 'name': 'hostname', 'type': 'str', 'value': "", 'readonly': True},
                     {'title': 'IP address:', 'name': 'ip', 'type': 'str','value': "", 'readonly': True},
                     {'title': 'Selected Device:', 'name': 'selected_device', 'type': 'str', 'value': '', 'readonly': True}
