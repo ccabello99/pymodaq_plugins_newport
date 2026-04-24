@@ -5,6 +5,8 @@ from pymodaq.control_modules.move_utility_classes import DAQ_Move_base,\
 from pymodaq.utils.daq_utils import ThreadCommand # object used to send info back to the main thread
 from pymodaq.utils.parameter import Parameter
 from pylablib.devices import Newport
+import time
+from PyQt5 import QtCore
 
 
 class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
@@ -45,6 +47,7 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
     
     def ini_attributes(self):
         self.controller: Newport.Picomotor8742 = None
+        self._last_poll_time = 0.0  # Used to throttle polling frequency
 
     def get_actuator_value(self):
         """Get the current value from the hardware with scaling conversion.
@@ -53,6 +56,7 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
         -------
         float: The position obtained after scaling conversion.
         """
+        self._throttle_polling(50.0)  # wait 50 ms between polls
         axis = self.axis_value
         pos = DataActuator(data=self.controller.get_position(axis=axis))
         pos = self.get_position_with_scaling(pos)
@@ -182,6 +186,15 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
       """Stop the actuator and emits move_done signal"""
       self.controller.stop(axis=self.axis_value)
       self.emit_status(ThreadCommand('Update_Status', ['The motion of the actuator is stopped.']))
+
+    def _throttle_polling(self, min_interval_ms: float = 10.0):
+        """Ensures that polls to the hardware are not too frequent."""
+        now = time.perf_counter()
+        elapsed_ms = (now - self._last_poll_time) * 1000
+        remaining = min_interval_ms - elapsed_ms
+        if remaining > 0:
+            QtCore.QThread.msleep(int(remaining))
+        self._last_poll_time = time.perf_counter()         
 
 
 if __name__ == '__main__':
