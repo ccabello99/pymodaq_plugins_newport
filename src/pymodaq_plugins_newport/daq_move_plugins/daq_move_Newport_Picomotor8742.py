@@ -24,8 +24,8 @@ class DAQ_Move_Newport_Picomotor8742(DAQ_Move_base):
     _epsilon: Union[float, List[float]] = 10.0
     data_actuator_type = DataActuatorType.DataActuator
 
-    devices_info = {"hostnames": ["8742-14296", "8742-14382", "8742-14383", "8742-100628"],
-               "ips": ["192.168.178.202", "192.168.178.184", "192.168.178.185", "192.168.178.217"],
+    devices_info = {"hostnames": ["8742-11190", "8742-105697", "8742-107056"],
+               "ips": ["192.168.1.173", "192.168.1.175", "192.168.1.177"],
                }
     
     
