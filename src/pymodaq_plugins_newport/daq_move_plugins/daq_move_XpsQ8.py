@@ -45,7 +45,7 @@ class DAQ_Move_XpsQ8(DAQ_Move_base):
             "title": "XPS IP address :",
             "name": "xps_ip_address",
             "type": "str",
-            "value": "192.168.0.254",
+            "value": "192.168.178.176",
         },  # IP address of my system
         {
             "title": "XPS Port :",
@@ -57,7 +57,7 @@ class DAQ_Move_XpsQ8(DAQ_Move_base):
             "title": "Group :",
             "name": "group",
             "type": "str",
-            "value": "Group2",
+            "value": "Group6",
         },  # Group to be moved
         {
             "title": "Positionner :",
