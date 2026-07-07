@@ -40,46 +40,101 @@ class DAQ_Move_XpsQ8(DAQ_Move_base):
     _epsilon = 600e-6
     data_actuator_type = DataActuatorType["DataActuator"]
 
+    stage_to_group = {"OAP":"Group3", "BeamStab-Lens":"Group6"}
+
     params = [
-        {
-            "title": "XPS IP address :",
-            "name": "xps_ip_address",
-            "type": "str",
-            "value": "192.168.178.176",
-        },  # IP address of my system
-        {
-            "title": "XPS Port :",
-            "name": "xps_port",
-            "type": "int",
-            "value": 5001,
-        },  # Port of my system, should be the same for others ?
-        {
-            "title": "Group :",
-            "name": "group",
-            "type": "str",
-            "value": "Group6",
-        },  # Group to be moved
-        {
-            "title": "Positionner :",
-            "name": "positionner",
-            "type": "str",
-            "value": "Pos",
-        },  # positionner to be moved
-    ] + comon_parameters_fun(is_multiaxes, axis_names=_axis_names, epsilon=_epsilon)
+            {
+                "title": "XPS IP address :",
+                "name": "xps_ip_address",
+                "type": "str",
+                "value": "192.168.178.176",
+            },
+            {
+                "title": "XPS Port :",
+                "name": "xps_port",
+                "type": "int",
+                "value": 5001,
+            },
+            {
+                "title": "Group :",
+                "name": "group_number",
+                "type": "list",
+                "value": "OAP",
+                "limits": ["OAP", "BeamStab-Lens"],
+            },
+            {
+                "title": "Positioner :",
+                "name": "positioner",
+                "type": "str",
+                "value": "Pos",
+            },
+            {
+                "title": "Status:",
+                "name": "status",
+                "type": "group",
+                "children": [
+                    {
+                        "title": "Group status:",
+                        "name": "group_status",
+                        "type": "str",
+                        "value": "",
+                        "readonly": True,
+                    },
+                    {
+                        "title": "Following error:",
+                        "name": "following_error",
+                        "type": "float",
+                        "value": 0.0,
+                        "readonly": True,
+                    },
+                    {
+                        "title": "Positioner error:",
+                        "name": "positioner_error",
+                        "type": "str",
+                        "value": "",
+                        "readonly": True,
+                    },
+                ],
+            },
+        ] + comon_parameters_fun(is_multiaxes, axis_names=_axis_names, epsilon=_epsilon)
 
     def ini_attributes(self):
         self.controller: SimpleXPS | None = None
 
     def get_actuator_value(self):
-        """Get the current value from the hardware with scaling conversion.
-
-        Returns
-        -------
-        float: The position obtained after scaling conversion.
-        """
+        """Get the current value from the hardware, and refresh status readouts."""
         pos = DataActuator(data=self.controller.get_position())
         pos = self.get_position_with_scaling(pos)
+        self._update_status()
         return pos
+
+    def _update_status(self):
+        """Poll group/positioner status and surface it in the settings tree."""
+        try:
+            status_code, status_string = self.controller.get_group_status()
+            self.settings.child("status", "group_status").setValue(
+                f"{status_string} ({status_code})"
+            )
+        except XPSError as e:
+            self.settings.child("status", "group_status").setValue(f"Error: {e}")
+
+        try:
+            following_error = self.controller.get_following_error()
+            self.settings.child("status", "following_error").setValue(following_error)
+        except XPSError as e:
+            self.emit_status(ThreadCommand("Update_Status", [f"{e}"]))
+
+        try:
+            error_code, error_string = self.controller.get_positioner_error()
+            if error_code != 0:
+                self.settings.child("status", "positioner_error").setValue(error_string)
+                self.emit_status(
+                    ThreadCommand("Update_Status", [f"Positioner error: {error_string}"])
+                )
+            else:
+                self.settings.child("status", "positioner_error").setValue("No error")
+        except XPSError as e:
+            self.emit_status(ThreadCommand("Update_Status", [f"{e}"]))
 
     def close(self):
         """Terminate the communication protocol"""
@@ -98,10 +153,11 @@ class DAQ_Move_XpsQ8(DAQ_Move_base):
             self.controller.set_ip(param.value())
         elif param.name() == "xps_port":
             self.controller.set_port(param.value())
-        elif param.name() == "group":
-            self.controller.set_group(param.value())
-        elif param.name() == "positionner":
-            self.controller.set_positionner(param.value())
+        elif param.name() == "group_number":
+            group = self.stage_to_group[param.value()]
+            self.controller.set_group(group)
+        elif param.name() == "positioner":
+            self.controller.set_positioner(param.value())
         else:
             pass
 
@@ -124,8 +180,8 @@ class DAQ_Move_XpsQ8(DAQ_Move_base):
             new_controller = SimpleXPS(
                 ip=self.settings["xps_ip_address"],
                 port=self.settings["xps_port"],
-                group=self.settings["group"],
-                positionner=self.settings["positionner"],
+                group=self.stage_to_group[self.settings["group_number"]],
+                positioner=self.settings["positioner"],
             )
         except XPSError as e:
             initialized = False

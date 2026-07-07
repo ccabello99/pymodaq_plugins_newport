@@ -15,7 +15,7 @@ class SimpleXPS:
         ip: str,
         port: int,
         group: str,
-        positionner: str,
+        positioner: str,
     ):
         """
         Parameters
@@ -26,8 +26,8 @@ class SimpleXPS:
             IP port for communication with the XPS. ex: 5001
         group: str
             name of the group to control. ex: "Group2"
-        positionner: str
-            name of the positionner. ex: "Pos"
+        positioner: str
+            name of the positioner. ex: "Pos"
         """
 
         # init the wrapper given by Newport and some attributes
@@ -40,8 +40,8 @@ class SimpleXPS:
 
         # Definition of the stage
         self._group = group
-        self._positioner = positionner
-        self._full_positionner_name = f"{group}.{positionner}"
+        self._positioner = positioner
+        self._full_positioner_name = f"{group}.{positioner}"
 
         # Some required initialisation steps
         self._init_commands()
@@ -114,7 +114,7 @@ class SimpleXPS:
         """Returns current the position"""
         if self.check_connected():
             [error_code, current_position] = self.xps.GroupPositionCurrentGet(
-                self.socket_id, self._full_positionner_name, 1
+                self.socket_id, self._full_positioner_name, 1
             )
             if error_code != 0:
                 self.display_error_and_close(error_code, "GroupPositionCurrentGet")
@@ -127,7 +127,7 @@ class SimpleXPS:
         """Moves the stage to the position value."""
         if self.check_connected():
             [error_code, return_string] = self.xps.GroupMoveAbsolute(
-                self.socket_id, self._full_positionner_name, [value]
+                self.socket_id, self._full_positioner_name, [value]
             )
             if error_code != 0:
                 self.display_error_and_close(error_code, "GroupMoveAbsolute")
@@ -138,7 +138,7 @@ class SimpleXPS:
         """Moves the stage to value relative to it's current position."""
         if self.socket_id != -1:
             [error_code, return_string] = self.xps.GroupMoveRelative(
-                self.socket_id, self._full_positionner_name, [value]
+                self.socket_id, self._full_positioner_name, [value]
             )
             if error_code != 0:
                 self.display_error_and_close(error_code, "GroupMoveRelative")
@@ -156,6 +156,63 @@ class SimpleXPS:
         else:
             raise XPSError("XPS connection failed")
 
+    def get_group_status(self):
+        """Returns (status_code, status_string) for the current group."""
+        if not self.check_connected():
+            raise XPSError("XPS connection failed")
+
+        [error_code, status_code] = self.xps.GroupStatusGet(self.socket_id, self._group)
+        if error_code != 0:
+            self.display_error_and_close(error_code, "GroupStatusGet")
+            return None
+
+        [error_code, status_string] = self.xps.GroupStatusStringGet(
+            self.socket_id, status_code
+        )
+        if error_code != 0:
+            self.display_error_and_close(error_code, "GroupStatusStringGet")
+            return status_code, ""
+
+        return status_code, status_string
+
+    def get_following_error(self):
+        """Returns the current following error, in controller units, for the positioner."""
+        if not self.check_connected():
+            raise XPSError("XPS connection failed")
+
+        [error_code, following_error] = self.xps.GroupCurrentFollowingErrorGet(
+            self.socket_id, self._group, 1
+        )
+        if error_code != 0:
+            self.display_error_and_close(error_code, "GroupCurrentFollowingErrorGet")
+            return None
+
+        return float(following_error)
+
+    def get_positioner_error(self):
+        """Reads (and clears) the positioner error code. Returns (code, description)."""
+        if not self.check_connected():
+            raise XPSError("XPS connection failed")
+
+        [error_code, positioner_error_code] = self.xps.PositionerErrorGet(
+            self.socket_id, self._full_positioner_name
+        )
+        if error_code != 0:
+            self.display_error_and_close(error_code, "PositionerErrorGet")
+            return None
+
+        if positioner_error_code == 0:
+            return 0, "No error"
+
+        [error_code, error_string] = self.xps.PositionerErrorStringGet(
+            self.socket_id, positioner_error_code
+        )
+        if error_code != 0:
+            self.display_error_and_close(error_code, "PositionerErrorStringGet")
+            return positioner_error_code, ""
+
+        return positioner_error_code, error_string
+
     def set_group(self, group: str):
         """
         Sets the group to control with the plugin
@@ -164,17 +221,17 @@ class SimpleXPS:
             group: Name of the group
         """
         self._group = group
-        self._full_positionner_name = f"{group}.{self._positionner}"
+        self._full_positioner_name = f"{group}.{self._positioner}"
 
-    def set_positionner(self, positionner: str):
+    def set_positioner(self, positioner: str):
         """
-        Sets the positionner to control with the plugin
+        Sets the positioner to control with the plugin
 
         Args:
-            positionner: Name of the positionner
+            positioner: Name of the positioner
         """
-        self._positionner = positionner
-        self._full_positionner_name = f"{self._group}.{positionner}"
+        self._positioner = positioner
+        self._full_positioner_name = f"{self._group}.{positioner}"
 
     def set_ip(self, ip: str):
         """
